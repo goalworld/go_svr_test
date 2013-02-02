@@ -3,7 +3,6 @@ package server
 import (
 	"net"
 	"errors"
-	"io"
 	"sync"
 )
 const(
@@ -22,10 +21,15 @@ type ServerListener interface{
 	OnMessage(id int,data []byte);
 	OnClose(id int,err error);
 }
+type ConnCoder interface{
+	WriteMessage(buf []byte) error
+	ReadMessage()([]byte, error)
+	Close()error
+}
 type Server struct{
 	s_lis *net.TCPListener
 	s_out chan *message
-	s_conMap map[int]*net.TCPConn
+	s_conMap map[int]ConnCoder
 	s_idIndex int
 	s_stop bool
 	s_ober ServerListener
@@ -40,7 +44,7 @@ func NewServer(ip string,port int) (s *Server ,err error){
 		return
 	}
 	s.s_out = make(chan *message,1024)
-	s.s_conMap = make(map[int]*net.TCPConn)
+	s.s_conMap = make(map[int]ConnCoder)
 	s.s_idIndex = 0;
 	s.s_stop = false;
 	return
@@ -87,41 +91,16 @@ func (p *Server) Stop() {
 	p.s_stop = true;
 	
 }
-func writeHeadBuf(lens uint32)[]byte{
-	buf := make([]byte,4);
-	buf[0] = byte(lens>>24 	& 0x000000ff);
-	buf[1] = byte(lens>>16 	& 0x000000ff);
-	buf[2] = byte(lens>>8  	& 0x000000ff);
-	buf[3] = byte(lens 		& 0x000000ff);
-	return buf;
-}
-func readHeadBuf(buf[]byte)uint32{
-	return uint32(buf[0])<<24|uint32(buf[1])<<16|uint32(buf[2])<<8|uint32(buf[3]);
-}
 func (p * Server) SendToAll(data []byte)error{
-	buf := writeHeadBuf(uint32(len(data)));
 	for _,con := range(p.s_conMap) {
-		_ ,err := con.Write(buf);
-		if(err != nil){
-			return err;
-		}
-		_ ,err = con.Write(data);
-		if(err != nil){
-			return err;
-		}
+		con.WriteMessage(data);
 	}
 	return nil;
-}
+} 
 func (p * Server) SendToId( id int,data []byte) error{
 	con := p.s_conMap[id];
 	if(con != nil){
-		buf := writeHeadBuf(uint32(len(data)));
-		_ ,err := con.Write(buf);
-		if(err != nil){
-			return err;
-		}
-		_ ,err = con.Write(data);
-		return err;
+		return con.WriteMessage(data);
 	}
 	return errors.New("conn not exist")
 }
@@ -137,34 +116,24 @@ func (p *Server) acceptLoop(){
 		}
 		id := p.s_idIndex;
 		p.s_idIndex++;
-		p.s_conMap[id] = con;
+		conc := newHeadConnCoder(con);
+		p.s_conMap[id] = conc;
 		p.wg.Add(1)
-		go p.connLoop(id,con)
+		go p.connLoop(id,conc)
 		p.s_out <- &message{Id:id,Type:type_connect};
 	}
 }
-func (p * Server) connLoop( id int ,con * net.TCPConn){
+func (p * Server) connLoop( id int ,con  ConnCoder){
 	defer func(){
 			con.Close()
 			p.wg.Done();
 		}()
-	var head uint32;
-	var err error;
-	var ret []byte = make([]byte,4);
 	for !p.s_stop {
-		_,err = io.ReadFull(con,ret);
+		buf,err := con.ReadMessage();
 		if err != nil {
-			break;
-		}
-		//BIG E
-		head = readHeadBuf(ret);
-		buf := make([]byte,head);
-		_,err = io.ReadFull(con,buf);
-		if err != nil {
-			break;
+			p.s_out <- &message{Id:id,Type:type_close,Err:err};
+			return
 		}
 		p.s_out <- &message{Id:id,Type:type_message,Data:buf};
 	}
-	p.s_out <- &message{Id:id,Type:type_close,Err:err};
-	return
 }

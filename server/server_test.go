@@ -8,7 +8,7 @@ func ( p *Lis)OnConnect(id int){
 	println("OnConnect",id);
 }
 func (p * Lis)OnMessage(id int,data []byte){
-	//println("OnMessage",id,string(data))
+	println("OnMessage",id,string(data))
 	err := p.svr.SendToId(id,data);
 	if(err!=nil){
 		//fmt.Println("ssend",err);
