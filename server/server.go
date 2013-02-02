@@ -21,11 +21,7 @@ type ServerListener interface{
 	OnMessage(id int,data []byte);
 	OnClose(id int,err error);
 }
-type ConnCoder interface{
-	WriteMessage(buf []byte) error
-	ReadMessage()([]byte, error)
-	Close()error
-}
+
 type Server struct{
 	s_lis *net.TCPListener
 	s_out chan *message
