@@ -4,17 +4,25 @@ import "testing"
 type Lis struct{
 	svr *Server
 	t * testing.T
+	i int
 }
 func ( p *Lis)OnConnect(id int){
 	println("OnConnect",id);
+	p.i++
 }
 func (p * Lis)OnMessage(id int,data []byte){
 	println("OnMessage",id,string(data))
 	p.svr.Broadcast(data);
 }
 func (p * Lis)OnClose(id int,err error){
-	fmt.Println("OnClose",id,err,p.svr.ConnectionNum());
+	p.i--;
+	fmt.Println("OnClose",id,err,p.svr.ConnectionNum(),p.i);
+	
+	if(p.i == 0){
+		stop = true
+	}
 }
+var stop = false
 func TestServer(t * testing.T) {
 	out := make(chan *Message)
 	svr,err := NewServer(":7686",out);
@@ -25,7 +33,7 @@ func TestServer(t * testing.T) {
 	}
 	lis := Lis{svr,t}
 	svr.Run()
-	for {
+	for !stop {
 		select{
 			case msg := <- out:
 				switch msg.Type{
@@ -40,6 +48,7 @@ func TestServer(t * testing.T) {
 				}
 		}
 	}
+	fmt.Println(stop)
 	svr.Close()
 	svr.Wait()
 }
