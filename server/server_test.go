@@ -3,16 +3,14 @@ import "fmt"
 import "testing"
 type Lis struct{
 	svr *Server
+	t * testing.T
 }
 func ( p *Lis)OnConnect(id int){
 	println("OnConnect",id);
 }
 func (p * Lis)OnMessage(id int,data []byte){
 	println("OnMessage",id,string(data))
-	err := p.svr.Send(id,data);
-	if(err!=nil){
-		//fmt.Println("ssend",err);
-	}
+	p.svr.Broadcast(data);
 }
 func (p * Lis)OnClose(id int,err error){
 	fmt.Println("OnClose",id,err,p.svr.ConnectionNum());
@@ -25,7 +23,7 @@ func TestServer(t * testing.T) {
 		t.FailNow();
 		return
 	}
-	lis := Lis{svr}
+	lis := Lis{svr,t}
 	svr.Run()
 	for {
 		select{
@@ -44,5 +42,4 @@ func TestServer(t * testing.T) {
 	}
 	svr.Close()
 	svr.Wait()
-	
 }
