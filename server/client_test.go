@@ -12,4 +12,11 @@ func TestClient(t * testing.T) {
 		t.Log(err);
 		t.FailNow();
 	}
+	buf ,errs := svr.Recv()
+	if(errs != nil){
+		t.Log(err);
+		t.FailNow();
+	}else{
+		t.Log(string(buf));
+	}
 }

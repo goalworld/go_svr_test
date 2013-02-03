@@ -23,7 +23,7 @@ type ServerListener interface{
 }
 
 type Server struct{
-	s_lis *net.TCPListener
+	s_lis net.Listener
 	s_out chan *message
 	s_conMap map[int]ConnCoder
 	s_idIndex int
@@ -31,10 +31,9 @@ type Server struct{
 	s_ober ServerListener
 	wg sync.WaitGroup
 }
-func NewServer(ip string,port int) (s *Server ,err error){
+func NewServer(addr string) (s *Server ,err error){
 	s = new(Server)
-	addr := net.TCPAddr{net.ParseIP(ip),port};
-	s.s_lis ,err = net.ListenTCP("tcp",&addr)
+	s.s_lis ,err = net.Listen("tcp",addr)
 	if(err != nil){
 		s = nil
 		return
@@ -106,7 +105,7 @@ func (p *Server) acceptLoop(){
 			p.wg.Done();
 		}()
 	for !p.s_stop {
-		con , err := p.s_lis.AcceptTCP()
+		con , err := p.s_lis.Accept()
 		if(err != nil){
 			break
 		}

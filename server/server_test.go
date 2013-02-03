@@ -21,7 +21,7 @@ func (p * Lis)OnClose(id int,err error){
 	}
 }
 func TestServer(t * testing.T) {
-	svr,err := NewServer("0.0.0.0",7686);
+	svr,err := NewServer(":7686");
 	if(err != nil){
 		t.Log(err);
 		t.FailNow();
