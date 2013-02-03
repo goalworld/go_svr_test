@@ -9,24 +9,40 @@ func ( p *Lis)OnConnect(id int){
 }
 func (p * Lis)OnMessage(id int,data []byte){
 	println("OnMessage",id,string(data))
-	err := p.svr.SendToId(id,data);
+	err := p.svr.Send(id,data);
 	if(err!=nil){
 		//fmt.Println("ssend",err);
 	}
 }
 func (p * Lis)OnClose(id int,err error){
 	fmt.Println("OnClose",id,err,p.svr.ConnectionNum());
-	if(p.svr.ConnectionNum() == 0 ){
-		p.svr.Stop();
-	}
 }
 func TestServer(t * testing.T) {
-	svr,err := NewServer(":7686");
+	out := make(chan *Message)
+	svr,err := NewServer(":7686",out);
 	if(err != nil){
 		t.Log(err);
 		t.FailNow();
 		return
 	}
-	svr.SetListener(&Lis{svr})
+	lis := Lis{svr}
 	svr.Run()
+	for {
+		select{
+			case msg := <- out:
+				switch msg.Type{
+				case Type_connect:
+					lis.OnConnect(msg.Id)
+				case Type_message:
+					lis.OnMessage(msg.Id,msg.Data)
+				case Type_close:
+					lis.OnClose(msg.Id,msg.Err)
+				default:
+					println("UNKONW MESSAGE",msg)
+				}
+		}
+	}
+	svr.Close()
+	svr.Wait()
+	
 }
